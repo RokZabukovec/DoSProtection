@@ -6,7 +6,7 @@ type Response struct {
 }
 
 /**
- * Create a new MissingClientIdResponse.
+ * Create a new general Response object.
  */
 func NewResponse(code int, message string) *Response {
 	return &Response{
