@@ -1,9 +1,9 @@
 package main
 
 import (
+	"Client/server"
 	"flag"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -21,48 +21,52 @@ type Request struct {
 	ClientId int
 }
 
-var req_number *int
-var res_number *int
-
-func sendRequest(w int, jobs <-chan Request, results chan<- Result, wg *sync.WaitGroup) {
-	for req := range jobs {
-		resp, err := http.Get("http://localhost:8000/?client_id=" + fmt.Sprintf("%d", w))
-
+func sendRequest(w int, jobs <-chan Request, results chan<- Result, wg *sync.WaitGroup, serv server.Server) {
+	var url = fmt.Sprintf("%s:%d/?client_id=%d", serv.URL, serv.Port, w)
+	for range jobs {
+		resp, err := http.Get(url)
 		if err != nil {
-			fmt.Printf("Client %d: Error: %s\n", req.ClientId, err.Error())
+			fmt.Println("The request could not be made.")
+			fmt.Println(err)
+			os.Exit(1)
 		}
 		resp.Body.Close()
-		resp.Close = true
 		results <- Result{Status: resp.StatusCode, ClietId: w}
 		wg.Done()
 	}
 }
 
 func main() {
+	// The initial data that can be modified by the user.
 	clients := flag.Int("clients", 1, "The number of clients to generate.")
 	threads := flag.Int("threads", 1, "The number of threads per client.")
+	address := flag.String("addr", "http://localhost", "The address of the server.")
+	port := flag.Int("port", 8000, "The port of the server.")
 	flag.Parse()
 
+	requestServer := server.NewServer(*address, *port)
+
+	// Validate if the provided URL is valid.
+	if !requestServer.IsValidUrl() {
+		fmt.Println("The provided URL is not valid.")
+		os.Exit(1)
+	}
+
+	// Validate if the server is reachable.
+	if !requestServer.IsReachable() {
+		fmt.Println("The server is not reachable.")
+		os.Exit(1)
+	}
+
+	// Create a channels to communicate between the workers and the main thread.
 	jobs := make(chan Request, *threads)
 	results := make(chan Result, *threads)
 	wg := &sync.WaitGroup{}
-	SetupCloseHandler(jobs, results, wg)
 
-	timeout := time.Duration(100 * time.Millisecond)
-	_, timeout_err := net.DialTimeout("tcp", "localhost:8000", timeout)
-
-	if timeout_err != nil {
-		panic("Server not reachable. Exiting.")
-	}
-
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
-
-	for w := 0; w < *clients; w++ {
-		go sendRequest(w, jobs, results, wg)
-	}
+	SetupShutdownHandler(jobs, results, wg)
 
 	for client := 1; client <= *clients; client++ {
+		go sendRequest(client, jobs, results, wg, *requestServer)
 		for t := 0; t < *threads; t++ {
 			go func() {
 				for {
@@ -75,24 +79,24 @@ func main() {
 		}
 	}
 
+	// Handle all the responses and print them to the console.
 	for result := range results {
 		fmt.Printf("Client: %d\tStatus: %d\n", result.ClietId, result.Status)
 	}
 
 }
 
-// SetupCloseHandler creates a 'listener' on a new goroutine which will notify the
+// SetupShutdownHandler creates a 'listener' on a new goroutine which will notify the
 // program if it receives an interrupt from the OS. We then handle this by calling
 // our clean up procedure and exiting the program.
-func SetupCloseHandler(jobs chan Request, results chan Result, wg *sync.WaitGroup) {
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+func SetupShutdownHandler(jobs chan Request, results chan Result, wg *sync.WaitGroup) {
+	done := make(chan os.Signal)
+	signal.Notify(done, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		<-c
+		<-done
 		close(jobs)
 		fmt.Println("Shutting down...Waiting for all requests to finish.")
 		wg.Wait()
-		fmt.Printf("Still processing %d requests.\n", len(jobs))
 		close(results)
 		fmt.Println("Bye!")
 		os.Exit(0)

@@ -6,7 +6,9 @@ import (
 	"Server/server"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 )
@@ -25,17 +27,32 @@ func main() {
 	flag.Parse()
 	muxServer := http.NewServeMux()
 	muxServer.HandleFunc("/", handle)
-	server.Run(*port, muxServer)
+	err := server.Run(*port, muxServer)
+
+	if err != nil && err != http.ErrServerClosed {
+		fmt.Println(err)
+		os.Exit(0)
+	}
 }
 
+/*
+* Handles the request to the "/" path.
+ */
 func handle(w http.ResponseWriter, r *http.Request) {
+
+	// Only allow GET requests.
+	if r.Method != "GET" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
 	var parameter string = "client_id"
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	params, ok := r.URL.Query()[parameter]
 
 	if !ok || len(params) < 1 {
 		w.WriteHeader(http.StatusBadRequest)
-		missingParameterResponse := responses.NewMissingParameterResponse(parameter)
+		missingParameterResponse := responses.NewResponse(http.StatusBadRequest, "Missing parameter.")
 		body, _ := json.Marshal(missingParameterResponse)
 		w.Write([]byte(body))
 		return
@@ -44,7 +61,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	clientIdAsInt, err := strconv.Atoi(params[0])
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		missingParameterResponse := responses.NewInvalidParameterTypeResponse(parameter, "Parameter client_id must be of type integer.")
+		missingParameterResponse := responses.NewResponse(http.StatusBadRequest, "Parameter client_id must be of type integer.")
 		body, _ := json.Marshal(missingParameterResponse)
 		w.Write([]byte(body))
 		return
@@ -52,7 +69,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 
 	if c.GetCount(clientIdAsInt) > 4 && c.IsTimerRunning(clientIdAsInt) {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		serviceUnavailableResponse := responses.NewServiceUnavailableResponse("You reached your request limit.")
+		serviceUnavailableResponse := responses.NewResponse(http.StatusServiceUnavailable, "Too many requests.")
 		body, _ := json.Marshal(serviceUnavailableResponse)
 		w.Write([]byte(body))
 		return
@@ -60,9 +77,6 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		wg := sync.WaitGroup{}
 		c.Increment(clientIdAsInt, &wg)
 		w.WriteHeader(http.StatusOK)
-		success := responses.NewSuccessfulResponse("Ok.")
-		body, _ := json.Marshal(success)
-		w.Write([]byte(body))
 		return
 	}
 }

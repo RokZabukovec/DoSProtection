@@ -12,7 +12,7 @@ type Counter struct {
 }
 
 /**
- * Create a new MissingClientIdResponse.
+ * Create a new Counter.
  */
 func NewCounter() *Counter {
 	return &Counter{
@@ -22,19 +22,23 @@ func NewCounter() *Counter {
 }
 
 /**
- * Increments client_id by one.
+ * Increments counter by one and resets it when it hits the limit.
  */
 func (c *Counter) Increment(client_id int, wg *sync.WaitGroup) {
 	if !c.IsPresent(client_id) {
 		c.InitializeClient(client_id)
 	}
 
+	// Check if the number of requests is less than the limit.
+	// Reset the counter and timer.
 	if c.GetCount(client_id) > 4 {
 		c.InitializeClient(client_id)
 	}
 
 	wg.Add(1)
 	go func() {
+		// Lock the counter and increment the count.
+		// So it doesn't get modified by other goroutines.
 		c.mutex.Lock()
 		client := c.counter[client_id]
 		client.count++
@@ -45,7 +49,7 @@ func (c *Counter) Increment(client_id int, wg *sync.WaitGroup) {
 	wg.Wait()
 	c.mutex.Lock()
 	client := c.counter[client_id]
-	fmt.Printf("ID: %d -> %d \n", client_id, client.count)
+	fmt.Printf("Client ID: %d\t made %d requests.\n", client_id, client.count)
 	c.mutex.Unlock()
 }
 
@@ -86,6 +90,9 @@ func (c *Counter) InitializeClient(client_id int) int {
 	return c.GetCount(client_id)
 }
 
+/**
+ * Starts the clien's counter.
+ */
 func (c *Counter) StartTimer(client_id int) {
 	c.mutex.Lock()
 	client := c.counter[client_id]
@@ -105,14 +112,19 @@ func (c *Counter) StartTimer(client_id int) {
 	fmt.Printf("Timer for client %d expired with %d requests.\n", client_id, clientAfter.count)
 }
 
+/**
+ * Checks if the timer is currently running.
+ */
 func (c *Counter) IsTimerRunning(client_id int) bool {
 	c.mutex.Lock()
 	client := c.counter[client_id]
-	isRunning := client.timerIsRunning
 	c.mutex.Unlock()
-	return isRunning
+	return client.timerIsRunning
 }
 
+/**
+ * Resets the client's count.
+ */
 func (c *Counter) ResetClientCount(client_id int) {
 	c.mutex.Lock()
 	client := c.counter[client_id]
