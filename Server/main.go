@@ -52,9 +52,10 @@ func handle(w http.ResponseWriter, r *http.Request) {
 
 	if !ok || len(params) < 1 {
 		w.WriteHeader(http.StatusBadRequest)
-		missingParameterResponse := responses.NewResponse(http.StatusBadRequest, "Missing parameter.")
+		missingParameterResponse := responses.NewResponse(http.StatusBadRequest, "Missing client_id parameter.")
 		body, _ := json.Marshal(missingParameterResponse)
 		w.Write([]byte(body))
+
 		return
 	}
 
@@ -64,6 +65,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		missingParameterResponse := responses.NewResponse(http.StatusBadRequest, "Parameter client_id must be of type integer.")
 		body, _ := json.Marshal(missingParameterResponse)
 		w.Write([]byte(body))
+
 		return
 	}
 
@@ -72,11 +74,13 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		serviceUnavailableResponse := responses.NewResponse(http.StatusServiceUnavailable, "Too many requests.")
 		body, _ := json.Marshal(serviceUnavailableResponse)
 		w.Write([]byte(body))
+
 		return
 	} else {
 		wg := sync.WaitGroup{}
 		c.Increment(clientIdAsInt, &wg)
 		w.WriteHeader(http.StatusOK)
+
 		return
 	}
 }
