@@ -34,7 +34,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	params, ok := r.URL.Query()[parameter]
 
 	if !ok || len(params) < 1 {
-		w.WriteHeader(400)
+		w.WriteHeader(http.StatusBadRequest)
 		missingParameterResponse := responses.NewMissingParameterResponse(parameter)
 		body, _ := json.Marshal(missingParameterResponse)
 		w.Write([]byte(body))
@@ -43,7 +43,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 
 	clientIdAsInt, err := strconv.Atoi(params[0])
 	if err != nil {
-		w.WriteHeader(400)
+		w.WriteHeader(http.StatusBadRequest)
 		missingParameterResponse := responses.NewInvalidParameterTypeResponse(parameter, "Parameter client_id must be of type integer.")
 		body, _ := json.Marshal(missingParameterResponse)
 		w.Write([]byte(body))
@@ -51,7 +51,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if c.GetCount(clientIdAsInt) > 4 && c.IsTimerRunning(clientIdAsInt) {
-		w.WriteHeader(503)
+		w.WriteHeader(http.StatusServiceUnavailable)
 		serviceUnavailableResponse := responses.NewServiceUnavailableResponse("You reached your request limit.")
 		body, _ := json.Marshal(serviceUnavailableResponse)
 		w.Write([]byte(body))
@@ -59,7 +59,7 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	} else {
 		wg := sync.WaitGroup{}
 		c.Increment(clientIdAsInt, &wg)
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 		success := responses.NewSuccessfulResponse("Ok.")
 		body, _ := json.Marshal(success)
 		w.Write([]byte(body))
