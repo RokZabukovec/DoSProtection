@@ -82,6 +82,7 @@ func (c *Counter) IsPresent(client_id int) bool {
  */
 func (c *Counter) InitializeClient(client_id int) int {
 	// check if key is present in counter
+	// and set the count to 0
 	if c.IsPresent(client_id) {
 		c.ResetClientCount(client_id)
 	}

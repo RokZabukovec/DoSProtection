@@ -36,7 +36,7 @@ func main() {
 }
 
 /*
-* Handles the request to the "/" path.
+ * Handles the request to the "/" path.
  */
 func handle(w http.ResponseWriter, r *http.Request) {
 
