@@ -24,7 +24,7 @@ The purpose of this project was to learn more about concurrency and the inner wo
 ### The concepts I learned during
 - Concurrency. Using go routines to handle a lot more work simultaneously.
 - Channels. Using channels to communicate between different go routines.
-- Locks. When dealing with multiple go routines the thread safty is important.
+- Locks. When dealing with multiple go routines the thread safety is important.
 - Pointers. How the variables can be accessed dirrectly in memory using pointers.
 
 
